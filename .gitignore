@@ -1,0 +1,19 @@
+# Frontend
+node_modules
+dist
+*.local
+.DS_Store
+
+# Backend
+backend/.env
+backend/__pycache__/
+backend/**/__pycache__/
+backend/*.pyc
+backend/refund_requests.db
+backend/storage/pdfs/
+backend/storage/agreements/
+backend/static/signature.png
+
+# Frontend env (contains VITE_API_BASE)
+.env
+.env.local

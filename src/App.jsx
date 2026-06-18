@@ -1,0 +1,828 @@
+import { useState, useEffect } from "react";
+import "./shared.css";
+
+// ── Constants ────────────────────────────────────────────────
+// Vite proxy rewrites /api/* → http://localhost:8000/api/* in dev.
+// In production, set VITE_API_BASE to your Railway backend URL.
+const API_BASE = import.meta.env.VITE_API_BASE || "";
+
+// Sales reps — name + HubSpot owner id + email
+const SALES_REPS = [
+  { name: "Alvin Seah",     id: "161621502", email: "alvin.seah@epos.com.sg" },
+  { name: "Andy Chia",      id: "218061175", email: "andy.chia@epos.com.sg" },
+  { name: "Arvinder Singh", id: "81514542",  email: "arvinder.singh@epos.com.sg" },
+  { name: "Brandon Leong",  id: "326921814", email: "brandon.leong@epos.com.sg" },
+  { name: "Belle Phia",     id: "162289152", email: "belle.phia@epos.com.sg" },
+  { name: "Crystal Lee",    id: "253502246", email: "crystal.lee@epos.com.sg" },
+  { name: "Dominic Chan",   id: "57274755",  email: "dominic.chan@epos.com.sg" },
+  { name: "Fenny Wong",     id: "53224564",  email: "fenny.wong@epos.com.sg" },
+  { name: "Glenn Wee",      id: "37676685",  email: "glenn.wee@epos.com.sg" },
+  { name: "Hadi Sng",       id: "61019637",  email: "hadi.sng@epos.com.sg" },
+  { name: "Harold Lim",     id: "344217702", email: "harold.lim@epos.com.sg" },
+  { name: "Julie Chan",     id: "29349349",  email: "julie.chan@epos.com.sg" },
+  { name: "Tasha Goh",      id: "81330493",  email: "tasha.goh@epos.com.sg" },
+  { name: "Mervin Cai",     id: "83765548",  email: "mervin.cai@epos.com.sg" },
+  { name: "Rachel Tai",     id: "163983329", email: "rachel.tai@epos.com.sg" },
+  { name: "Ruth Han",       id: "16431507",  email: "ruth.han@epos.com.sg" },
+  { name: "Winston Heng",   id: "83762739",  email: "winston.heng@epos.com.sg" },
+  { name: "Zack Gaffar",    id: "488014670", email: "zack.gaffar@epos.com.sg" },
+];
+
+const SG_BANKS = [
+  "DBS / POSB",
+  "OCBC",
+  "UOB",
+  "Standard Chartered",
+  "HSBC",
+  "Citibank",
+  "Maybank",
+  "Bank of China",
+  "RHB",
+  "CIMB",
+  "PayNow",
+];
+
+const initialFields = {
+  sales_rep:        "",
+  deal_id:          "",
+  bank_name:        "",
+  account_no:       "",
+  refund_amount:    "",
+  refund_reason:    "",
+  refund_type:      "",
+  partial_products: "",
+};
+
+const REQUIRED = ["sales_rep", "deal_id", "bank_name", "account_no", "refund_amount", "refund_reason", "refund_type"];
+const FIELD_LABELS = {
+  sales_rep:     "Deal Owner",
+  deal_id:       "Deal",
+  bank_name:     "Bank Name",
+  account_no:    "Account No.",
+  refund_amount: "Refund Amount",
+  refund_reason: "Refund Reason",
+  refund_type:   "Refund Type",
+};
+
+function sumProducts(selectedNames, products) {
+  if (!selectedNames.length) return "";
+  const total = selectedNames.reduce((sum, name) => {
+    const p = products.find((x) => x.name === name);
+    const val = parseFloat((p?.amount || "0").replace(/,/g, ""));
+    return sum + (isNaN(val) ? 0 : val);
+  }, 0);
+  return total > 0 ? total.toFixed(2) : "";
+}
+
+// ── Reusable components ──────────────────────────────────────
+
+function FieldGroup({ label, sublabel, required, error, children }) {
+  return (
+    <div className="field-group">
+      <label>{label}{required && <span className="req"> *</span>}</label>
+      {sublabel && <div className="field-sublabel">{sublabel}</div>}
+      {children}
+      {error && <div className="error-msg">{error}</div>}
+    </div>
+  );
+}
+
+function ProductCheckboxes({ products, selected, onToggle, loading, error }) {
+  if (loading) {
+    return (
+      <div className="product-loading">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+          style={{ animation: "spin 1s linear infinite" }}>
+          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+        </svg>
+        Loading products from deal…
+      </div>
+    );
+  }
+
+  return (
+    <div className="product-list">
+      {products.map((p) => {
+        const isSelected = selected.includes(p.name);
+        return (
+          <div
+            key={p.name}
+            className={`product-item${isSelected ? " selected" : ""}${error ? " has-error" : ""}`}
+            onClick={() => onToggle(p.name)}
+            role="checkbox"
+            aria-checked={isSelected}
+            tabIndex={0}
+            onKeyDown={(e) => e.key === " " && onToggle(p.name)}
+          >
+            <div className="product-checkbox">
+              <svg
+                className="product-check-icon"
+                width="11" height="11" viewBox="0 0 12 12"
+                fill="none" stroke="white" strokeWidth="2.2"
+                strokeLinecap="round" strokeLinejoin="round"
+              >
+                <polyline points="2 6 5 9 10 3" />
+              </svg>
+            </div>
+            <span className="product-name">{p.name}</span>
+            {p.amount && (
+              <span className="product-amount">SGD {p.amount}</span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Hardware status → visual config
+const HW_CONFIG = {
+  "Not Deployed": { color: "#15803d", bg: "#f0fdf4", border: "#bbf7d0", dot: "#22c55e" },
+  "Ongoing":      { color: "#b45309", bg: "#fffbeb", border: "#fde68a", dot: "#f59e0b" },
+  "Deployed":     { color: "#b91c1c", bg: "#fef2f2", border: "#fecaca", dot: "#ef4444" },
+};
+
+function HardwareCard({ status, loading }) {
+  if (loading) {
+    return (
+      <div className="hardware-card fade-in">
+        <div className="hardware-card-header">
+          <div className="hardware-card-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/>
+              <line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+            HARDWARE STATUS
+          </div>
+          <div className="hardware-loading">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+              style={{ animation: "spin 1s linear infinite" }}>
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            </svg>
+            Checking…
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!status) return null;
+
+  const cfg        = HW_CONFIG[status.status] || HW_CONFIG["Not Deployed"];
+  const isDeployed = status.status === "Deployed";
+
+  const fmtDate = (d) => {
+    if (!d) return null;
+    try {
+      return new Date(d).toLocaleDateString("en-SG", { day: "numeric", month: "short", year: "numeric" });
+    } catch { return d; }
+  };
+
+  return (
+    <div className="hardware-card fade-in" style={{ borderColor: cfg.border }}>
+      <div className="hardware-card-header">
+        <div className="hardware-card-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/>
+            <line x1="12" y1="17" x2="12" y2="21"/>
+          </svg>
+          HARDWARE STATUS
+        </div>
+        <span className="hardware-status-badge"
+          style={{ background: cfg.bg, color: cfg.color, borderColor: cfg.border }}>
+          <span className="hardware-status-dot" style={{ background: cfg.dot }} />
+          {status.status}
+        </span>
+      </div>
+      {status.deployment_date ? (
+        <div className="hardware-card-date">
+          Deployment date: <strong>{fmtDate(status.deployment_date)}</strong>
+        </div>
+      ) : (
+        <div className="hardware-card-date">Deployment date: Not yet scheduled</div>
+      )}
+      {isDeployed && (
+        <div className="hardware-warning">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+            stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+            style={{ flexShrink: 0, marginTop: 1 }}>
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          Hardware has been deployed for this deal. The BD can still submit a refund request for director review.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Stage ID → card header colour
+const STAGE_COLOURS = {
+  "3243113153": "#59cc53",   // Payment Collected    → primary green
+  "3263420111": "#0a21ab",   // Closed Won (Auto)    → primary blue
+  "3243113154": "#0891b2",   // Payment Verified     → teal
+};
+
+function DealCard({ deal }) {
+  const colour = STAGE_COLOURS[deal.stage_id] || "#59cc53";
+  const ref    = `#${deal.id}`;
+
+  return (
+    <div className="deal-card fade-in">
+      <div className="deal-card-header" style={{ background: colour }}>
+        <span className="deal-card-ref">{ref}</span>
+        <span className="deal-card-badge">{deal.stage}</span>
+      </div>
+      <div className="deal-card-body">
+        <span className="deal-card-name">{deal.name}</span>
+        <span className="deal-card-amount">SGD {deal.amount}</span>
+      </div>
+    </div>
+  );
+}
+
+function ThankYou({ onReset }) {
+  return (
+    <div className="form-card">
+      <div className="form-body" style={{ paddingTop: 48, paddingBottom: 52 }}>
+        <div className="thankyou-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
+            stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </div>
+        <h2 className="thankyou-title">Refund request submitted!</h2>
+        <p className="thankyou-note">
+          Your refund request has been sent to the Sales Director for approval.
+          You'll receive an email with the signed Return &amp; Deposit Agreement once it's approved.
+          The deal has been moved to the <strong>Refund Requested</strong> stage in HubSpot.
+        </p>
+        <button className="submit-btn" onClick={onReset}>
+          Submit Another Request
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Status config for My Requests ────────────────────────────
+const STATUS_CONFIG = {
+  pending:          { label: "Awaiting Director",  color: "#6b7280", bg: "#f3f4f6", border: "#e5e7eb", dot: "#9ca3af" },
+  director_approved: { label: "Awaiting Document", color: "#b45309", bg: "#fffbeb", border: "#fde68a", dot: "#f59e0b" },
+  document_ready:   { label: "Document Ready",     color: "#15803d", bg: "#f0fdf4", border: "#bbf7d0", dot: "#22c55e" },
+  rejected:         { label: "Rejected",           color: "#b91c1c", bg: "#fef2f2", border: "#fecaca", dot: "#ef4444" },
+};
+
+function RequestCard({ req }) {
+  const cfg = STATUS_CONFIG[req.status] || STATUS_CONFIG.pending;
+  const fmtDate = (d) => {
+    try { return new Date(d).toLocaleDateString("en-SG", { day: "numeric", month: "short", year: "numeric" }); }
+    catch { return d; }
+  };
+
+  return (
+    <div className="request-card fade-in">
+      <div className="request-card-top">
+        <div className="request-card-name">{req.deal_name}</div>
+        <span className="request-status-badge"
+          style={{ color: cfg.color, background: cfg.bg, borderColor: cfg.border }}>
+          <span className="request-status-dot" style={{ background: cfg.dot }} />
+          {cfg.label}
+        </span>
+      </div>
+      <div className="request-card-meta">
+        <span>SGD {req.refund_amount}</span>
+        <span>{req.refund_type === "full" ? "Full Refund" : "Partial Refund"}</span>
+        <span>Submitted {fmtDate(req.created_at)}</span>
+      </div>
+      {req.status === "rejected" && req.rejection_reason && (
+        <div className="request-rejection">
+          <strong>Rejection reason:</strong> {req.rejection_reason}
+        </div>
+      )}
+      {req.status === "document_ready" && (
+        <a
+          href={`${API_BASE}/api/download/${req.id}`}
+          className="request-download-btn"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Download Agreement
+        </a>
+      )}
+    </div>
+  );
+}
+
+function MyRequests() {
+  const [selectedRep, setSelectedRep] = useState("");
+  const [requests, setRequests]       = useState([]);
+  const [loading, setLoading]         = useState(false);
+
+  useEffect(() => {
+    if (!selectedRep) { setRequests([]); return; }
+    setLoading(true);
+    fetch(`${API_BASE}/api/my-requests?sales_rep_name=${encodeURIComponent(selectedRep)}`)
+      .then((r) => r.ok ? r.json() : [])
+      .then((data) => setRequests(Array.isArray(data) ? data : []))
+      .catch(() => setRequests([]))
+      .finally(() => setLoading(false));
+  }, [selectedRep]);
+
+  return (
+    <div className="my-requests-body">
+      <FieldGroup label="Select Your Name" sublabel="View all refund requests you have submitted.">
+        <div className="select-wrap">
+          <select
+            value={selectedRep}
+            onChange={(e) => setSelectedRep(e.target.value)}
+            className={selectedRep ? "has-value" : ""}
+          >
+            <option value="">Select your name</option>
+            {SALES_REPS.map((r) => (
+              <option key={r.id} value={r.name}>{r.name}</option>
+            ))}
+          </select>
+        </div>
+      </FieldGroup>
+
+      {loading && (
+        <div className="requests-loading">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+            style={{ animation: "spin 1s linear infinite" }}>
+            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+          </svg>
+          Loading requests…
+        </div>
+      )}
+
+      {!loading && selectedRep && requests.length === 0 && (
+        <div className="requests-empty">
+          No refund requests found for <strong>{selectedRep}</strong>.
+        </div>
+      )}
+
+      {!loading && requests.map((req) => (
+        <RequestCard key={req.id} req={req} />
+      ))}
+    </div>
+  );
+}
+
+// ── Main App ─────────────────────────────────────────────────
+export default function App() {
+  const [page, setPage]             = useState("form");
+  const [activeTab, setActiveTab]   = useState("submit");
+  const [fields, setFields]         = useState(initialFields);
+  const [errors, setErrors]         = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [apiError, setApiError]     = useState("");
+
+  const [deals, setDeals]               = useState([]);
+  const [loadingDeals, setLoadingDeals] = useState(false);
+
+  const [dealProducts, setDealProducts]         = useState([]);   // [{name, amount}]
+  const [loadingProducts, setLoadingProducts]   = useState(false);
+  const [selectedProducts, setSelectedProducts] = useState([]);   // ["POS Software", ...]
+
+  const [hardwareStatus, setHardwareStatus]     = useState(null);
+  const [loadingHardware, setLoadingHardware]   = useState(false);
+
+  // ── Fetch deals when rep changes ─────────────────────────
+  useEffect(() => {
+    if (!fields.sales_rep) {
+      setDeals([]);
+      return;
+    }
+    const rep = SALES_REPS.find((r) => r.name === fields.sales_rep);
+    if (!rep) return;
+
+    setLoadingDeals(true);
+    setApiError("");
+
+    fetch(`${API_BASE}/api/deals?owner_id=${rep.id}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to load deals");
+        return res.json();
+      })
+      .then((data) => setDeals(data))
+      .catch(() => setApiError("Could not load deals. Is the backend running?"))
+      .finally(() => setLoadingDeals(false));
+  }, [fields.sales_rep]);
+
+  // ── Fetch products + hardware status when deal changes ───
+  useEffect(() => {
+    if (!fields.deal_id) {
+      setDealProducts([]);
+      setSelectedProducts([]);
+      setHardwareStatus(null);
+      setLoadingHardware(false);
+      return;
+    }
+
+    setLoadingProducts(true);
+    fetch(`${API_BASE}/api/deals/${fields.deal_id}/products`)
+      .then((res) => res.ok ? res.json() : [])
+      .then((data) => setDealProducts(Array.isArray(data) ? data : []))
+      .catch(() => setDealProducts([]))
+      .finally(() => setLoadingProducts(false));
+
+    setLoadingHardware(true);
+    setHardwareStatus(null);
+    fetch(`${API_BASE}/api/deals/${fields.deal_id}/hardware-status`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => setHardwareStatus(data))
+      .catch(() => setHardwareStatus(null))
+      .finally(() => setLoadingHardware(false));
+  }, [fields.deal_id]);
+
+  const selectedDeal = deals.find((d) => d.id === fields.deal_id);
+  const isPayNow     = fields.bank_name === "PayNow";
+
+  // ── Handlers ──────────────────────────────────────────────
+  function handleChange(e) {
+    const { name, value } = e.target;
+    setFields((prev) => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
+  }
+
+  function handleRepChange(e) {
+    setFields((prev) => ({ ...prev, sales_rep: e.target.value, deal_id: "", refund_amount: "" }));
+    setDealProducts([]);
+    setSelectedProducts([]);
+    setHardwareStatus(null);
+    if (errors.sales_rep) setErrors((prev) => ({ ...prev, sales_rep: "" }));
+  }
+
+  function handleDealChange(e) {
+    const newDealId = e.target.value;
+    const newDeal   = deals.find((d) => d.id === newDealId);
+    // Auto-fill amount if full refund already selected
+    const newAmount = fields.refund_type === "full" && newDeal?.amount
+      ? newDeal.amount.replace(/,/g, "")
+      : "";
+    setFields((prev) => ({ ...prev, deal_id: newDealId, refund_amount: newAmount }));
+    setSelectedProducts([]);
+    if (errors.deal_id) setErrors((prev) => ({ ...prev, deal_id: "" }));
+    if (errors.refund_amount) setErrors((prev) => ({ ...prev, refund_amount: "" }));
+  }
+
+  function handleTypeSelect(type) {
+    let newAmount = "";
+    if (type === "full" && selectedDeal?.amount) {
+      newAmount = selectedDeal.amount.replace(/,/g, "");
+    } else if (type === "partial") {
+      newAmount = sumProducts(selectedProducts, dealProducts);
+    }
+    setFields((prev) => ({ ...prev, refund_type: type, refund_amount: newAmount }));
+    setSelectedProducts([]);
+    if (errors.refund_type)   setErrors((prev) => ({ ...prev, refund_type: "" }));
+    if (errors.refund_amount) setErrors((prev) => ({ ...prev, refund_amount: "" }));
+  }
+
+  function handleProductToggle(productName) {
+    const next = selectedProducts.includes(productName)
+      ? selectedProducts.filter((p) => p !== productName)
+      : [...selectedProducts, productName];
+    setSelectedProducts(next);
+    // Recalculate total from new selection
+    const newAmount = sumProducts(next, dealProducts);
+    setFields((prev) => ({ ...prev, refund_amount: newAmount }));
+    if (errors.partial_products)
+      setErrors((prev) => ({ ...prev, partial_products: "" }));
+    if (errors.refund_amount)
+      setErrors((prev) => ({ ...prev, refund_amount: "" }));
+  }
+
+  function handleBankChange(e) {
+    const bank = e.target.value;
+    setFields((prev) => ({ ...prev, bank_name: bank, account_no: "" }));
+    if (errors.bank_name)  setErrors((prev) => ({ ...prev, bank_name: "" }));
+    if (errors.account_no) setErrors((prev) => ({ ...prev, account_no: "" }));
+  }
+
+  // ── Validation ─────────────────────────────────────────────
+  function validate() {
+    const newErrors = {};
+
+    REQUIRED.forEach((key) => {
+      if (!fields[key] || fields[key].toString().trim() === "")
+        newErrors[key] = `${FIELD_LABELS[key]} is required.`;
+    });
+
+    if (fields.refund_type === "partial") {
+      if (dealProducts.length > 0) {
+        // Checkbox mode — at least one must be ticked
+        if (selectedProducts.length === 0)
+          newErrors.partial_products = "Please select at least one product.";
+      } else {
+        // Free-text fallback
+        if (!fields.partial_products.trim())
+          newErrors.partial_products = "Please specify the product(s) for partial refund.";
+      }
+    }
+
+    if (fields.refund_amount &&
+        isNaN(Number(fields.refund_amount.toString().replace(/,/g, "")))) {
+      newErrors.refund_amount = "Please enter a valid amount.";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }
+
+  // ── Submit ─────────────────────────────────────────────────
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!validate()) return;
+
+    const rep = SALES_REPS.find((r) => r.name === fields.sales_rep);
+
+    // Build the partial_products string
+    let partialProductsValue = "";
+    if (fields.refund_type === "partial") {
+      partialProductsValue = dealProducts.length > 0
+        ? selectedProducts.join(", ")
+        : fields.partial_products;
+    }
+
+    const payload = {
+      sales_rep_name:   fields.sales_rep,
+      sales_rep_id:     rep?.id || "",
+      sales_rep_email:  rep?.email || "",
+      deal_id:          fields.deal_id,
+      deal_name:        selectedDeal?.name || "",
+      bank_name:        fields.bank_name,
+      account_no:       fields.account_no,
+      refund_amount:    fields.refund_amount,
+      refund_reason:    fields.refund_reason,
+      refund_type:      fields.refund_type,
+      partial_products: partialProductsValue,
+    };
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/refund-request`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error();
+      setPage("thankyou");
+    } catch {
+      setApiError("Submission failed. Please try again or check your connection.");
+    } finally {
+      setSubmitting(false);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }
+
+  function handleReset() {
+    setPage("form");
+    setFields(initialFields);
+    setErrors({});
+    setApiError("");
+    setDeals([]);
+    setDealProducts([]);
+    setSelectedProducts([]);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  if (page === "thankyou") return <ThankYou onReset={handleReset} />;
+
+  return (
+    <div className="form-card">
+      <div className="form-header">
+        <div className="form-logo"><img src="/logo.webp" alt="EPOS Logo" /></div>
+        <h1 className="form-title">Refund Request Form</h1>
+        <p className="form-subtitle">
+          Submit a refund request for a closed deal, or check the status of an existing request.
+        </p>
+      </div>
+
+      {/* Tab bar */}
+      <div className="tab-bar">
+        <button
+          className={`tab-btn${activeTab === "submit" ? " active" : ""}`}
+          onClick={() => setActiveTab("submit")}
+          type="button"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+          Submit Request
+        </button>
+        <button
+          className={`tab-btn${activeTab === "my-requests" ? " active" : ""}`}
+          onClick={() => setActiveTab("my-requests")}
+          type="button"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+            <polyline points="10 9 9 9 8 9"/>
+          </svg>
+          My Requests
+        </button>
+      </div>
+
+      {activeTab === "my-requests" && <MyRequests />}
+
+      {activeTab === "submit" && (
+      <div className="form-body">
+        <form onSubmit={handleSubmit} noValidate>
+
+          {/* 1. Deal Owner */}
+          <FieldGroup label="1. Deal Owner" required error={errors.sales_rep}
+            sublabel="Select your name from the list.">
+            <div className="select-wrap">
+              <select
+                name="sales_rep"
+                value={fields.sales_rep}
+                onChange={handleRepChange}
+                className={[errors.sales_rep ? "has-error" : "", fields.sales_rep ? "has-value" : ""].join(" ").trim()}
+              >
+                <option value="">Select your name</option>
+                {SALES_REPS.map((r) => (
+                  <option key={r.id} value={r.name}>{r.name} ({r.email})</option>
+                ))}
+              </select>
+            </div>
+          </FieldGroup>
+
+          {/* 2. Deal */}
+          <FieldGroup label="2. Deal" required error={errors.deal_id}
+            sublabel="Only your Closed Won and Payment Verified deals are shown.">
+            <div className="select-wrap">
+              <select
+                name="deal_id"
+                value={fields.deal_id}
+                onChange={handleDealChange}
+                disabled={!fields.sales_rep || loadingDeals}
+                className={[errors.deal_id ? "has-error" : "", fields.deal_id ? "has-value" : ""].join(" ").trim()}
+              >
+                <option value="">
+                  {!fields.sales_rep  ? "Select a deal owner first" :
+                   loadingDeals       ? "Loading deals…"            : "Select a deal"}
+                </option>
+                {deals.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            </div>
+          </FieldGroup>
+
+          {/* Hardware status card — shown when deal is selected */}
+          {selectedDeal && (
+            <HardwareCard status={hardwareStatus} loading={loadingHardware} />
+          )}
+
+          {/* Deal card preview */}
+          {selectedDeal && <DealCard deal={selectedDeal} />}
+
+          <hr className="section-divider" />
+
+          {/* 3. Refund type */}
+          <FieldGroup label="3. Refund Type" required error={errors.refund_type}>
+            <div className="toggle-buttons">
+              {[["full", "Full Refund"], ["partial", "Partial Refund"]].map(([val, lbl]) => (
+                <button key={val} type="button"
+                  className={`toggle-btn${fields.refund_type === val ? " active" : ""}`}
+                  onClick={() => handleTypeSelect(val)}>
+                  <span className="toggle-radio"><span className="toggle-radio-dot" /></span>
+                  {lbl}
+                </button>
+              ))}
+            </div>
+          </FieldGroup>
+
+          {/* 3a. Products (partial refund only) */}
+          {fields.refund_type === "partial" && (
+            <FieldGroup
+              label="Select Product(s) for Partial Refund"
+              required
+              error={errors.partial_products}
+              sublabel={
+                dealProducts.length > 0
+                  ? "Select the product(s) being refunded from this deal."
+                  : loadingProducts
+                  ? undefined
+                  : "No products found on this deal — type the product name(s) manually."
+              }
+            >
+              {loadingProducts ? (
+                <ProductCheckboxes products={[]} selected={[]} onToggle={() => {}} loading={true} />
+              ) : dealProducts.length > 0 ? (
+                <ProductCheckboxes
+                  products={dealProducts}
+                  selected={selectedProducts}
+                  onToggle={handleProductToggle}
+                  loading={false}
+                  error={!!errors.partial_products}
+                />
+              ) : (
+                <textarea
+                  name="partial_products"
+                  value={fields.partial_products}
+                  onChange={handleChange}
+                  className={errors.partial_products ? "has-error" : ""}
+                  placeholder="e.g. Soundbox x1, Payment Terminal x2"
+                />
+              )}
+            </FieldGroup>
+          )}
+
+          {/* 4. Refund amount — auto-filled, locked */}
+          <FieldGroup label="4. Refund Amount" required error={errors.refund_amount}
+            sublabel={
+              !fields.refund_type ? "Select a refund type above to auto-calculate." :
+              fields.refund_type === "full" ? "Auto-filled from deal value." :
+              "Auto-calculated from selected product(s)."
+            }>
+            <div className="amount-wrap">
+              <span className="amount-prefix">SGD</span>
+              <input
+                type="text"
+                name="refund_amount"
+                value={fields.refund_amount}
+                readOnly
+                className={[
+                  errors.refund_amount ? "has-error" : "",
+                  fields.refund_amount ? "amount-autofilled" : "",
+                ].join(" ").trim()}
+                placeholder="Auto-calculated"
+              />
+            </div>
+          </FieldGroup>
+
+          {/* 5. Bank Name */}
+          <FieldGroup label="5. Bank Name" required error={errors.bank_name}>
+            <div className="select-wrap">
+              <select
+                name="bank_name"
+                value={fields.bank_name}
+                onChange={handleBankChange}
+                className={[errors.bank_name ? "has-error" : "", fields.bank_name ? "has-value" : ""].join(" ").trim()}
+              >
+                <option value="">Select a bank</option>
+                {SG_BANKS.map((b) => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
+              </select>
+            </div>
+          </FieldGroup>
+
+          {/* 6. Account No. or PayNow — shown conditionally */}
+          {fields.bank_name && (
+            <FieldGroup
+              label={isPayNow ? "6. PayNow No." : "6. Account No."}
+              required
+              error={errors.account_no}
+            >
+              <input
+                type="text"
+                name="account_no"
+                value={fields.account_no}
+                onChange={handleChange}
+                className={errors.account_no ? "has-error" : ""}
+                placeholder={isPayNow ? "Mobile number or UEN" : "Bank account number"}
+              />
+            </FieldGroup>
+          )}
+
+          {/* 7. Refund reason */}
+          <FieldGroup label="7. Refund Reason" required error={errors.refund_reason}>
+            <textarea name="refund_reason" value={fields.refund_reason}
+              onChange={handleChange} className={errors.refund_reason ? "has-error" : ""}
+              placeholder="Explain the reason for this refund request" />
+          </FieldGroup>
+
+          {apiError && <div className="error-msg" style={{ marginBottom: 14 }}>{apiError}</div>}
+
+          <hr className="section-divider" />
+          <button type="submit" className="submit-btn" disabled={submitting}>
+            {submitting ? "Submitting…" : "Submit Refund Request"}
+          </button>
+
+        </form>
+      </div>
+      )}
+    </div>
+  );
+}
+

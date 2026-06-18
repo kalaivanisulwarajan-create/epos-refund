@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Already Actioned — EPOS</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Arial, sans-serif; background: #f0f4f8;
+      min-height: 100vh; display: flex; align-items: center;
+      justify-content: center; padding: 24px;
+    }
+    .card {
+      background: #fff; border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.10);
+      max-width: 480px; width: 100%; overflow: hidden;
+    }
+    .header { background: #1a3c6e; padding: 28px 36px; color: #fff; }
+    .header h1 { font-size: 20px; }
+    .body { padding: 32px 36px; text-align: center; }
+    .icon { width: 60px; height: 60px; margin: 0 auto 20px; display: block; }
+    h2 { color: #92400e; font-size: 18px; margin-bottom: 10px; }
+    p  { color: #555; font-size: 14px; line-height: 1.6; }
+    .footer {
+      background: #f5f5f5; padding: 14px 36px;
+      font-size: 11px; color: #aaa; text-align: center;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="header"><h1>EPOS Refund Management</h1></div>
+  <div class="body">
+    <svg class="icon" id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 122.88 111.24"><defs><style>.cls-1{fill:#fec901;fill-rule:evenodd;}.cls-2{fill:#010101;}</style></defs><title>risk</title><path d="M2.5,85l43-74.41h0a22.59,22.59,0,0,1,8-8.35,15.72,15.72,0,0,1,16,0,22.52,22.52,0,0,1,7.93,8.38l.23.44,42.08,73.07a20.91,20.91,0,0,1,3,10.84A16.44,16.44,0,0,1,121,102.4a15.45,15.45,0,0,1-5.74,6,21,21,0,0,1-11.35,2.78v0H17.7c-.21,0-.43,0-.64,0a19,19,0,0,1-7.83-1.74,15.83,15.83,0,0,1-6.65-5.72A16.26,16.26,0,0,1,0,95.18a21.66,21.66,0,0,1,2.2-9.62c.1-.2.2-.4.31-.59Z"/><path class="cls-1" d="M9.09,88.78l43-74.38c5.22-8.94,13.49-9.2,18.81,0l42.32,73.49c4.12,6.79,2.41,15.9-9.31,15.72H17.7C9.78,103.79,5,97.44,9.09,88.78Z"/><path class="cls-2" d="M57.55,83.15a5.47,5.47,0,0,1,5.85-1.22,5.65,5.65,0,0,1,2,1.3A5.49,5.49,0,0,1,67,86.77a5.12,5.12,0,0,1-.08,1.4,5.22,5.22,0,0,1-.42,1.34,5.51,5.51,0,0,1-5.2,3.25,5.63,5.63,0,0,1-2.26-.53,5.51,5.51,0,0,1-2.81-2.92A6,6,0,0,1,55.9,88a5.28,5.28,0,0,1,0-1.31h0a6,6,0,0,1,.56-2,4.6,4.6,0,0,1,1.14-1.56Zm8.12-10.21c-.19,4.78-8.28,4.78-8.46,0-.82-8.19-2.92-27.63-2.85-35.32.07-2.37,2-3.78,4.55-4.31a11.65,11.65,0,0,1,2.48-.25,12.54,12.54,0,0,1,2.5.25c2.59.56,4.63,2,4.63,4.43V38l-2.84,35Z"/></svg>
+    <h2>Already {{ action | title }}</h2>
+    <p>
+      The refund request for <strong>{{ deal_name }}</strong> has already been
+      <strong>{{ action }}</strong>. No further action is needed.
+    </p>
+    <p style="margin-top:12px;">You may close this window.</p>
+  </div>
+  <div class="footer">EPOS (Singapore) Pte Ltd Refund Management System</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Reject Refund Request - EPOS</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.10);
+      max-width: 520px;
+      width: 100%;
+      overflow: hidden;
+    }
+    .header {
+      background: #1a3c6e;
+      padding: 28px 36px;
+      color: #fff;
+    }
+    .header h1 { font-size: 20px; }
+    .header p  { margin-top: 6px; font-size: 13px; opacity: .85; }
+    .body { padding: 32px 36px; }
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: #fde8e8; border-radius: 999px;
+      padding: 6px 20px 6px 6px; margin: 0 auto 22px;
+    }
+    .status-badge .dot {
+      width: 34px; height: 34px; background: #ef4444; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 16px; font-weight: 900; flex-shrink: 0;
+    }
+    .status-badge .lbl { font-size: 14px; font-weight: 800; color: #dc2626; }
+    h2 { text-align: center; color: #111827; font-size: 18px; margin-bottom: 10px; }
+    p  { color: #555; font-size: 14px; line-height: 1.6; }
+    .detail-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin: 18px 0;
+    }
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      padding: 4px 0;
+      border-bottom: 1px solid #eee;
+    }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-row span:first-child { color: #888; font-weight: bold; }
+    .detail-row span:last-child  { color: #222; }
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 6px;
+      margin-top: 20px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 110px;
+      padding: 10px 14px;
+      border: 1.5px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: Arial, sans-serif;
+      resize: vertical;
+      outline: none;
+      transition: border-color .2s;
+    }
+    textarea:focus { border-color: #1a3c6e; }
+    .error-msg {
+      color: #dc2626;
+      font-size: 12.5px;
+      margin-top: 6px;
+    }
+    .btn {
+      display: block;
+      width: 100%;
+      margin-top: 18px;
+      padding: 13px;
+      background: #ef4444;
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .btn:hover { background: #dc2626; }
+    .footer {
+      background: #f5f5f5;
+      padding: 14px 36px;
+      font-size: 11px;
+      color: #aaa;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="header">
+    <h1>EPOS Refund Management</h1>
+  </div>
+  <div class="body">
+    <h2>Reject Refund Request</h2>
+    <p>You are about to reject the following refund request.
+       Please provide a reason. This will be sent to the respective Sales Representative.</p>
+    <div class="detail-box">
+      <div class="detail-row">
+        <span>Deal</span><span>{{ deal_name }}</span>
+      </div>
+      <div class="detail-row">
+        <span>Sales Rep</span><span>{{ rep_name }}</span>
+      </div>
+      <div class="detail-row">
+        <span>Refund Amount</span><span>SGD {{ amount }}</span>
+      </div>
+    </div>
+    <form method="POST" action="/api/reject/{{ token }}">
+      <label for="reason">Reason for Rejection <span style="color:#dc2626">*</span></label>
+      <textarea
+        id="reason"
+        name="reason"
+        placeholder="e.g. Insufficient documentation, deal does not qualify for refund…"
+        required
+      ></textarea>
+      {% if form_error %}
+        <div class="error-msg">{{ form_error }}</div>
+      {% endif %}
+      <button type="submit" class="btn">Confirm Rejection</button>
+    </form>
+  </div>
+  <div class="footer">EPOS (Singapore) Pte Ltd Refund Management System</div>
+</div>
+</body>
+</html>

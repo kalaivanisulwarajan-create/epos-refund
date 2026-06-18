@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Request Rejected — EPOS</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: #fff; border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.10);
+      max-width: 520px; width: 100%; overflow: hidden;
+    }
+    .header { background: #1a3c6e; padding: 28px 36px; color: #fff; }
+    .header h1 { font-size: 20px; }
+    .header p  { margin-top: 6px; font-size: 13px; opacity: .85; }
+    .body { padding: 32px 36px; }
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800&display=swap');
+    .status-card {
+      display: flex; align-items: center; gap: 14px;
+      border: 2px solid #0a21ab; border-radius: 12px;
+      padding: 12px 20px 12px 12px; margin: 0 0 24px;
+    }
+    .status-card .dot {
+      width: 38px; height: 38px; background: #fde8e8; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      color: #ef4444; font-size: 20px; font-weight: 900; flex-shrink: 0;
+    }
+    .status-card .lbl {
+      font-family: 'Montserrat', Arial, sans-serif;
+      font-size: 15px; font-weight: 800; letter-spacing: 0.4px;
+      color: #111827; text-transform: uppercase;
+    }
+    h2 { text-align: center; color: #111827; font-size: 18px; margin-bottom: 10px; }
+    p  { color: #555; font-size: 14px; line-height: 1.6; text-align: center; }
+    .reason-box {
+      background: #fef2f2; border-left: 4px solid #ef4444;
+      padding: 14px 18px; border-radius: 4px;
+      margin: 20px 0; font-size: 14px; color: #333; text-align: left;
+    }
+    .footer {
+      background: #f5f5f5; padding: 14px 36px;
+      font-size: 11px; color: #aaa; text-align: center;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="header">
+    <h1>EPOS Refund Management</h1>
+  </div>
+  <div class="body">
+    <h2>Rejection Submitted</h2>
+    <p>The refund request for <strong>{{ deal_name }}</strong> has been rejected.
+       <strong>{{ rep_name }}</strong> has been notified with your reason.</p>
+    <div class="reason-box">
+      <strong>Reason sent:</strong><br/>{{ reason }}
+    </div>
+    <p>You may close this window.</p>
+  </div>
+  <div class="footer">EPOS (Singapore) Pte Ltd Refund Management System</div>
+</div>
+</body>
+</html>
