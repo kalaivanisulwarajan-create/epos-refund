@@ -34,7 +34,8 @@ _FOOTER_STYLE = "background:#f5f5f5; padding:14px 32px; font-size:11px; color:#a
 
 
 def _smtp():
-    server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
+    server = smtplib.SMTP("smtp.gmail.com", 587)
+    server.starttls()
     server.login(GMAIL_SENDER, GMAIL_APP_PASSWORD)
     return server
 
